@@ -4,6 +4,7 @@ import {
   AttentionFirewall,
   Dashboard,
   DemoControls,
+  GitHubInboxPanel,
   MorningBrief,
   Timeline,
 } from '../components'
@@ -250,6 +251,7 @@ function App() {
       const events = inbox.items.map(mapInboxItemToExternalEvent)
 
       seenGitHubItemIdsRef.current = new Set(inbox.items.map((item) => item.id))
+      actions.updateGitHubInboxItems(inbox.items)
       setGitHubWatchStatus(
         `Last checked ${new Date(inbox.fetchedAt).toLocaleTimeString()} · ${inbox.counts.merged} items`,
       )
@@ -296,6 +298,7 @@ function App() {
         : inbox.items.filter((item) => !knownIds.has(item.id))
 
       seenGitHubItemIdsRef.current = new Set(inbox.items.map((item) => item.id))
+      actions.updateGitHubInboxItems(inbox.items)
       setGitHubWatchStatus(
         `Connected · last checked ${new Date(inbox.fetchedAt).toLocaleTimeString()} · ${inbox.counts.merged} items`,
       )
@@ -468,6 +471,10 @@ function App() {
         </section>
 
         <aside className="layout-right">
+          <GitHubInboxPanel
+            items={state.githubInboxItems ?? []}
+            status={githubWatchStatus}
+          />
           <AttentionFirewall items={firewallItems} />
           <DemoControls
             actions={visibleDemoActions}

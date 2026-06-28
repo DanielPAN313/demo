@@ -33,6 +33,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         }),
       updateSuggestedActions: (suggestedActions) =>
         dispatch({ type: 'updateSuggestedActions', payload: suggestedActions }),
+      updateGitHubInboxItems: (items) =>
+        dispatch({ type: 'updateGitHubInboxItems', payload: items }),
       switchScenario: (scenario) =>
         dispatch({ type: 'switchScenario', payload: scenario }),
       resetDemo: () => dispatch({ type: 'resetDemo' }),

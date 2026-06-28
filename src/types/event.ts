@@ -27,3 +27,18 @@ export type NotificationItem = {
   createdAt: string
 }
 
+export type GitHubInboxItem = {
+  id: ID
+  title: string
+  repo: string
+  url: string
+  kind: 'issue' | 'pull_request' | 'notification' | 'review_request' | 'mention'
+  reason: string
+  updatedAt: string
+  labels: string[]
+  priority: Priority
+  requiredAction: boolean
+  estimatedMinutes: number
+  summary: string
+}
+

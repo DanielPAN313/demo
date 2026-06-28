@@ -2,6 +2,7 @@ import type {
   AgentMessage,
   ExternalEvent,
   FixedSchedule,
+  GitHubInboxItem,
   NotificationItem,
   SchedulePlan,
   SuggestedAction,
@@ -28,6 +29,7 @@ export type AppState = {
   morningBrief?: MorningBrief
   agentMessages: AgentMessage[]
   suggestedActions: SuggestedAction[]
+  githubInboxItems: GitHubInboxItem[]
   currentScenario: ScenarioId
 }
 
@@ -41,6 +43,7 @@ export type AppAction =
   | { type: 'addAgentMessage'; payload: AgentMessage }
   | { type: 'addAgentMessages'; payload: AgentMessage[] }
   | { type: 'updateSuggestedActions'; payload: SuggestedAction[] }
+  | { type: 'updateGitHubInboxItems'; payload: GitHubInboxItem[] }
   | { type: 'switchScenario'; payload: ScenarioId }
   | { type: 'resetDemo' }
 
@@ -54,6 +57,7 @@ export type AppStateActions = {
   addAgentMessage: (message: Omit<AgentMessage, 'id' | 'createdAt'>) => void
   addAgentMessages: (messages: Omit<AgentMessage, 'id' | 'createdAt'>[]) => void
   updateSuggestedActions: (suggestedActions: SuggestedAction[]) => void
+  updateGitHubInboxItems: (items: GitHubInboxItem[]) => void
   switchScenario: (scenario: ScenarioId) => void
   resetDemo: () => void
 }
@@ -115,6 +119,7 @@ export const initialAppState: AppState = {
     },
   ],
   suggestedActions: [],
+  githubInboxItems: [],
   currentScenario: 'baseline',
 }
 
@@ -170,6 +175,11 @@ export const appStateReducer = (state: AppState, action: AppAction): AppState =>
       return {
         ...state,
         suggestedActions: action.payload,
+      }
+    case 'updateGitHubInboxItems':
+      return {
+        ...state,
+        githubInboxItems: action.payload,
       }
     case 'switchScenario':
       return {

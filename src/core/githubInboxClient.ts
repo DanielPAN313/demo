@@ -1,19 +1,6 @@
-import type { ExternalEvent, NotificationChannel, Priority } from '../types'
+import type { ExternalEvent, GitHubInboxItem, NotificationChannel, Priority } from '../types'
 
-export type GitHubInboxItem = {
-  id: string
-  title: string
-  repo: string
-  url: string
-  kind: 'issue' | 'pull_request' | 'notification' | 'review_request' | 'mention'
-  reason: string
-  updatedAt: string
-  labels: string[]
-  priority: Priority
-  requiredAction: boolean
-  estimatedMinutes: number
-  summary: string
-}
+export type { GitHubInboxItem } from '../types'
 
 type GitHubInboxResponse = {
   username: string
