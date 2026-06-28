@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { PointerEvent } from 'react'
 import {
   AgentPanel,
   AttentionFirewall,
@@ -366,6 +367,16 @@ function App() {
     )
   }
 
+  const handleLiquidPointer = useCallback((event: PointerEvent<HTMLElement>) => {
+    const target = event.currentTarget
+    const rect = target.getBoundingClientRect()
+    const x = ((event.clientX - rect.left) / rect.width) * 100
+    const y = ((event.clientY - rect.top) / rect.height) * 100
+
+    target.style.setProperty('--pointer-x', `${x.toFixed(2)}%`)
+    target.style.setProperty('--pointer-y', `${y.toFixed(2)}%`)
+  }, [])
+
   const timelineItems: TimelineItem[] = activeSchedulePlan.blocks.map((block) => ({
     time: block.startTime,
     title: block.title,
@@ -417,7 +428,7 @@ function App() {
     }))
 
   return (
-    <main className="agent-console">
+    <main className="agent-console" onPointerMove={handleLiquidPointer}>
       <header className="console-header">
         <div>
           <p className="eyebrow">24h Rhythm Agent Console</p>
