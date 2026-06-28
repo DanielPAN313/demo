@@ -1,8 +1,11 @@
 export type TimelineItem = {
   time: string
+  endTime?: string
+  date?: string
   title: string
   description: string
   mode: 'focus' | 'micro' | 'rest' | 'sleep' | 'fixed' | 'buffer'
+  priority?: 'P0' | 'P1' | 'P2' | 'P3'
 }
 
 export type TimelineProps = {
@@ -59,9 +62,15 @@ export function Timeline({ items = defaultItems }: TimelineProps) {
       <div className="timeline-list">
         {items.map((item) => (
           <article className={`timeline-item ${item.mode}`} key={`${item.time}-${item.title}`}>
-            <time>{item.time}</time>
+            <time>
+              {item.date && <span>{item.date}</span>}
+              <strong>{item.endTime ? `${item.time}-${item.endTime}` : item.time}</strong>
+            </time>
             <div>
-              <strong>{item.title}</strong>
+              <div className="timeline-item-head">
+                <strong>{item.title}</strong>
+                {item.priority && <span className={`priority-badge ${item.priority.toLowerCase()}`}>{item.priority}</span>}
+              </div>
               <p>{item.description}</p>
             </div>
           </article>

@@ -213,6 +213,7 @@ const createSchedulePlanFromInsight = (insight: PlanningInsight): SchedulePlan =
   blocks: insight.schedule.map<ScheduleBlock>((item, index) => ({
     id: `planning-${index}-${item.date}-${item.startTime.replace(':', '')}`,
     title: item.title,
+    date: item.date,
     startTime: item.startTime,
     endTime: item.endTime,
     type: item.priority === 'P0' || item.priority === 'P1' ? 'focus' : 'micro',

@@ -383,9 +383,12 @@ function App() {
 
   const timelineItems: TimelineItem[] = activeSchedulePlan.blocks.map((block) => ({
     time: block.startTime,
+    endTime: block.endTime,
+    date: block.date ?? activeSchedulePlan.date,
     title: block.title,
     description: block.reason ?? `${block.startTime}-${block.endTime}`,
     mode: block.type,
+    priority: block.priority,
   }))
 
   const dashboardMetrics: DashboardMetric[] = [

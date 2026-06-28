@@ -14,6 +14,7 @@ export type FixedSchedule = {
 export type ScheduleBlock = {
   id: ID
   title: string
+  date?: string
   startTime: string
   endTime: string
   type: TimeBlockType
