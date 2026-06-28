@@ -201,12 +201,8 @@ const createFallbackPlanningResponse = (
     },
   ],
   answer:
-    `**结论**\n我已经把“${command}”当作一个整体目标处理，而不是单条任务插入。\n\n` +
-    `**下一步排期**\n| 日期 | 时间 | 任务 | 优先级 | 原因 |\n|---|---|---|---|---|\n` +
-    `| 2026-06-29 | 09:30-10:30 | 核对官方 deadline 和材料要求 | P0 | 先确定硬约束，避免后续计划建立在错误信息上。 |\n` +
-    `| 2026-06-29 | 14:00-16:00 | 拆分交付物并完成第一版工作计划 | P1 | 把大目标转成可执行任务池，再整体排入后续日期。 |\n\n` +
-    `**待确认**\n- 官方 DDL、地点、材料要求需要优先核实。` +
-    (researchSummary.length > 0 ? `\n- 搜索摘要：${researchSummary.slice(0, 2).join('；')}` : ''),
+    `我会先把“${command}”当作一个完整目标处理。建议明天上午先花 1 小时核对官方截止日期、地点和材料要求；下午再用 2 小时把 camera-ready、注册、签证/出行、poster 或 slides、组内 rehearsal 拆成任务池。等硬性日期确认后，再把这些任务整体排到后续具体时间段里，避免和今天已有的 P0/P1 工作冲突。` +
+    (researchSummary.length > 0 ? '\n\n我已经先查了一轮公开信息，但仍建议以官方页面或邮件为准。' : ''),
 })
 
 const createSchedulePlanFromInsight = (insight: PlanningInsight): SchedulePlan => ({
@@ -271,9 +267,9 @@ export class PlanningAgent extends BaseAgent {
           role: 'system',
           content:
             '你是一个目标到日程的规划 agent。你必须先整体分析目标，再拆分子任务、识别依赖/DDL/冲突，最后输出具体到日期和开始结束时间的多天排期。' +
-            '不要只对单条任务局部排期。新增任务也要放回全局任务池重新分析。只输出 JSON，不要 markdown。' +
-            'answer 字段必须用中文，并严格包含这些标题：结论、搜索依据、任务拆解、冲突检查、具体排期、待确认。' +
-            '具体排期必须是 markdown 表格，列为：日期、时间、任务、优先级、原因。避免只写一段总结。',
+            '不要只对单条任务局部排期。新增任务也要放回全局任务池重新分析。只输出 JSON，不要在 JSON 外输出 markdown。' +
+            'answer 字段用自然中文直接回答用户，不要强制套固定标题或固定表格。' +
+            '简单问题就简短回答；复杂规划可以用短段落、清单或时间安排，但只展示真正有用的信息，避免堆搜索结果。',
         },
         {
           role: 'user',
@@ -303,7 +299,7 @@ export class PlanningAgent extends BaseAgent {
                   },
                 ],
                 answer:
-                  '中文规划报告，必须包含：结论、搜索依据、任务拆解、冲突检查、具体排期、待确认；具体排期用 markdown 表格',
+                  '自然中文回复。不要固定模板；按用户问题选择短答、清单或时间安排。',
               },
             },
             null,

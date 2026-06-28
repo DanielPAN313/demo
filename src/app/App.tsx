@@ -149,9 +149,13 @@ function App() {
     }
 
     const agentMessages = result.agentMessages ?? []
+    const compactMessage =
+      result.planningInsight && agentMessages.length > 0
+        ? agentMessages[0]
+        : agentMessages[agentMessages.length - 1]
     const visibleAgentMessages =
       options.compactChat && agentMessages.length > 0
-        ? [agentMessages[agentMessages.length - 1]]
+        ? [compactMessage]
         : agentMessages
     const visibleExplanations = options.compactChat ? [] : result.explanations ?? []
     const messages = [
