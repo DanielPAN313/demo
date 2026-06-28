@@ -104,11 +104,13 @@ function App() {
     text: message.content,
   }))
 
-  const handleDemoAction = (action: DemoAction) => {
+  const handleDemoAction = async (action: DemoAction) => {
     if (action.id === 'reset') {
       actions.resetDemo()
       return
     }
+
+    if (state.isAgentRunning) return
 
     if (action.id === 'poorSleep') {
       actions.setUserState(userStates.sleepDeprived)
@@ -127,37 +129,47 @@ function App() {
       actions.switchScenario(scenario)
     }
 
-    const result = runAgentPipeline(createEventFromAction(action))
+    actions.setAgentRunning(true)
+    actions.addAgentMessage({
+      role: 'system',
+      content: '正在调用 6 个 Agent 的统一 API...',
+    })
 
-    if (result.schedulePlan) {
-      actions.updateSchedulePlan(result.schedulePlan)
-    }
+    try {
+      const result = await runAgentPipeline(createEventFromAction(action))
 
-    if (result.notifications) {
-      actions.updateNotifications(result.notifications)
-    }
+      if (result.schedulePlan) {
+        actions.updateSchedulePlan(result.schedulePlan)
+      }
 
-    if (result.morningBrief) {
-      actions.updateMorningBrief(result.morningBrief)
-    }
+      if (result.notifications) {
+        actions.updateNotifications(result.notifications)
+      }
 
-    if (result.suggestedActions) {
-      actions.updateSuggestedActions(result.suggestedActions)
-    }
+      if (result.morningBrief) {
+        actions.updateMorningBrief(result.morningBrief)
+      }
 
-    const messages = [
-      ...(result.agentMessages ?? []).map((message) => ({
-        role: message.role,
-        content: message.content,
-      })),
-      ...(result.explanations ?? []).map((explanation) => ({
-        role: 'agent' as const,
-        content: `解释：${explanation}`,
-      })),
-    ]
+      if (result.suggestedActions) {
+        actions.updateSuggestedActions(result.suggestedActions)
+      }
 
-    if (messages.length > 0) {
-      actions.addAgentMessages(messages)
+      const messages = [
+        ...(result.agentMessages ?? []).map((message) => ({
+          role: message.role,
+          content: message.content,
+        })),
+        ...(result.explanations ?? []).map((explanation) => ({
+          role: 'agent' as const,
+          content: `解释：${explanation}`,
+        })),
+      ]
+
+      if (messages.length > 0) {
+        actions.addAgentMessages(messages)
+      }
+    } finally {
+      actions.setAgentRunning(false)
     }
   }
 
@@ -221,7 +233,7 @@ function App() {
         <div className="status-strip" aria-label="Console runtime status">
           <span className="system-status">
             <span className="live-dot" aria-hidden="true" />
-            {scenarioLabel[state.currentScenario]}
+            {state.isAgentRunning ? 'Agent API 调用中' : scenarioLabel[state.currentScenario]}
           </span>
           <span>{state.agentMessages.length} 条 Agent 消息</span>
           <span>{activeNotifications.length} 条通知已分流</span>

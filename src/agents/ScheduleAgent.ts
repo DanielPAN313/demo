@@ -1,5 +1,6 @@
 import { BaseAgent } from '../core/BaseAgent'
 import { generateSchedulePlan } from '../modules/scheduleEngine'
+import { runAgentApi } from '../services/agentApi'
 import type { AgentContext, AgentResult } from '../types'
 
 const DEMO_DATE = '2026-06-28'
@@ -9,7 +10,7 @@ export class ScheduleAgent extends BaseAgent {
     super('ScheduleAgent')
   }
 
-  run(context: AgentContext): AgentResult {
+  private buildLocalResult(context: AgentContext): AgentResult {
     const schedulePlan = generateSchedulePlan({
       date: DEMO_DATE,
       fixedSchedules: context.fixedSchedules,
@@ -33,5 +34,14 @@ export class ScheduleAgent extends BaseAgent {
         ),
       ],
     }
+  }
+
+  async run(context: AgentContext): Promise<AgentResult> {
+    return runAgentApi(
+      this.name,
+      '你负责生成今日 schedulePlan。必须保持 SchedulePlan JSON 结构：date、blocks、summary、generatedAt。blocks 中时间格式使用 HH:mm，type 使用 focus/micro/rest/sleep/fixed/buffer。',
+      context,
+      this.buildLocalResult(context),
+    )
   }
 }

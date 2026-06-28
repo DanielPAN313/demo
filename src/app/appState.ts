@@ -29,6 +29,7 @@ export type AppState = {
   agentMessages: AgentMessage[]
   suggestedActions: SuggestedAction[]
   currentScenario: ScenarioId
+  isAgentRunning: boolean
 }
 
 export type AppAction =
@@ -41,6 +42,7 @@ export type AppAction =
   | { type: 'addAgentMessages'; payload: AgentMessage[] }
   | { type: 'updateSuggestedActions'; payload: SuggestedAction[] }
   | { type: 'switchScenario'; payload: ScenarioId }
+  | { type: 'setAgentRunning'; payload: boolean }
   | { type: 'resetDemo' }
 
 export type AppStateActions = {
@@ -54,6 +56,7 @@ export type AppStateActions = {
   updateSuggestedActions: (suggestedActions: SuggestedAction[]) => void
   switchScenario: (scenario: ScenarioId) => void
   resetDemo: () => void
+  setAgentRunning: (isRunning: boolean) => void
 }
 
 export type AppStateContextValue = {
@@ -114,6 +117,7 @@ export const initialAppState: AppState = {
   ],
   suggestedActions: [],
   currentScenario: 'baseline',
+  isAgentRunning: false,
 }
 
 export const appStateReducer = (state: AppState, action: AppAction): AppState => {
@@ -162,6 +166,11 @@ export const appStateReducer = (state: AppState, action: AppAction): AppState =>
       return {
         ...state,
         currentScenario: action.payload,
+      }
+    case 'setAgentRunning':
+      return {
+        ...state,
+        isAgentRunning: action.payload,
       }
     case 'resetDemo':
       return initialAppState

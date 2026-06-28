@@ -1,4 +1,5 @@
 import { BaseAgent } from '../core/BaseAgent'
+import { runAgentApi } from '../services/agentApi'
 import type { AgentContext, AgentResult, Priority, Task } from '../types'
 
 const priorityScore: Record<Priority, number> = {
@@ -33,7 +34,7 @@ export class PriorityAgent extends BaseAgent {
     super('PriorityAgent')
   }
 
-  run(context: AgentContext): AgentResult {
+  private buildLocalResult(context: AgentContext): AgentResult {
     const topTasks = sortTasksByPriority(context.tasks).slice(0, 3)
     const taskSummary =
       topTasks.length > 0
@@ -53,5 +54,14 @@ export class PriorityAgent extends BaseAgent {
         ),
       ],
     }
+  }
+
+  async run(context: AgentContext): Promise<AgentResult> {
+    return runAgentApi(
+      this.name,
+      '你负责分析 tasks，按 priority、deadline、estimatedMinutes、status 输出最高优任务、解释和建议。不要生成排期。',
+      context,
+      this.buildLocalResult(context),
+    )
   }
 }

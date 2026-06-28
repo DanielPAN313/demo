@@ -1,4 +1,5 @@
 import { BaseAgent } from '../core/BaseAgent'
+import { runAgentApi } from '../services/agentApi'
 import type { AgentContext, AgentResult, ExternalEvent, Priority } from '../types'
 
 const priorityRank: Record<Priority, number> = {
@@ -16,7 +17,7 @@ export class EventAgent extends BaseAgent {
     super('EventAgent')
   }
 
-  run(context: AgentContext): AgentResult {
+  private buildLocalResult(context: AgentContext): AgentResult {
     const sortedEvents = [...context.externalEvents].sort(byPriority)
     const highPriorityEvent = sortedEvents.find(
       (event) => (event.priority === 'P0' || event.priority === 'P1') && event.requiredAction,
@@ -83,5 +84,14 @@ export class EventAgent extends BaseAgent {
         this.createMessage('EventAgent 已运行。外部事件已完成汇总，暂无必须立即处理的高优事件。'),
       ],
     }
+  }
+
+  async run(context: AgentContext): Promise<AgentResult> {
+    return runAgentApi(
+      this.name,
+      '你负责分析 externalEvents，识别 P0/P1、GitHub issue、requiredAction 和 estimatedMinutes。输出是否需要确认、重排或忽略的解释和建议动作。',
+      context,
+      this.buildLocalResult(context),
+    )
   }
 }

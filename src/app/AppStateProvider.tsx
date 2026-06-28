@@ -33,6 +33,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         dispatch({ type: 'updateSuggestedActions', payload: suggestedActions }),
       switchScenario: (scenario) =>
         dispatch({ type: 'switchScenario', payload: scenario }),
+      setAgentRunning: (isRunning) =>
+        dispatch({ type: 'setAgentRunning', payload: isRunning }),
       resetDemo: () => dispatch({ type: 'resetDemo' }),
     }),
     [],

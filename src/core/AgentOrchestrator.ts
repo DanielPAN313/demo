@@ -28,18 +28,25 @@ export class AgentOrchestrator {
     this.agents = agents
   }
 
-  run(context: AgentContext): AgentResult {
-    return this.agents.reduce<AgentResult>((result, agent) => {
-      try {
-        return mergeAgentResults(result, agent.run(context))
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error'
+  async run(context: AgentContext): Promise<AgentResult> {
+    const results = await Promise.all(
+      this.agents.map(async (agent) => {
+        try {
+          return agent.run(context)
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Unknown error'
 
-        return mergeAgentResults(result, {
-          explanations: [`${agent.name} failed: ${message}`],
-        })
-      }
-    }, emptyResult())
+          return {
+            explanations: [`${agent.name} failed: ${message}`],
+          }
+        }
+      }),
+    )
+
+    return results.reduce<AgentResult>(
+      (result, agentResult) => mergeAgentResults(result, agentResult),
+      emptyResult(),
+    )
   }
 }
 

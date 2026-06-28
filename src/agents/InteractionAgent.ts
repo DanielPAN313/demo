@@ -1,5 +1,6 @@
 import { BaseAgent } from '../core/BaseAgent'
 import { generateNotifications } from '../modules/notificationEngine'
+import { runAgentApi } from '../services/agentApi'
 import type { AgentContext, AgentResult, NotificationChannel, NotificationItem } from '../types'
 
 const countByChannel = (
@@ -12,7 +13,7 @@ export class InteractionAgent extends BaseAgent {
     super('InteractionAgent')
   }
 
-  run(context: AgentContext): AgentResult {
+  private buildLocalResult(context: AgentContext): AgentResult {
     const notifications = generateNotifications(context.externalEvents, {
       currentTime: context.currentTime,
       eventType: context.eventType,
@@ -35,5 +36,14 @@ export class InteractionAgent extends BaseAgent {
         ),
       ],
     }
+  }
+
+  async run(context: AgentContext): Promise<AgentResult> {
+    return runAgentApi(
+      this.name,
+      '你负责注意力防火墙和通知分流。把 externalEvents 分成 immediate、defer、digest、silent 四类，输出 notifications 和每条分流原因。',
+      context,
+      this.buildLocalResult(context),
+    )
   }
 }

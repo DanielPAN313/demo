@@ -2,7 +2,7 @@ import type { Agent, AgentContext, AgentResult } from '../types'
 
 const createPlaceholderAgent = (name: string): Agent => ({
   name,
-  run: (context: AgentContext): AgentResult => ({
+  run: async (context: AgentContext): Promise<AgentResult> => ({
     schedulePlan: context.schedulePlan,
     notifications: context.notifications,
     agentMessages: context.agentMessages,

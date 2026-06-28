@@ -1,5 +1,6 @@
 import { BaseAgent } from '../core/BaseAgent'
 import { generateMorningBrief } from '../modules/morningBrief'
+import { runAgentApi } from '../services/agentApi'
 import type { AgentContext, AgentMessage, AgentResult, SuggestedAction } from '../types'
 
 export class ExplainAgent extends BaseAgent {
@@ -7,7 +8,7 @@ export class ExplainAgent extends BaseAgent {
     super('ExplainAgent')
   }
 
-  run(context: AgentContext): AgentResult {
+  private buildLocalResult(context: AgentContext): AgentResult {
     const explanations: string[] = []
     const decisionFactors: string[] = []
     const suggestedActions: SuggestedAction[] = []
@@ -88,5 +89,14 @@ export class ExplainAgent extends BaseAgent {
       suggestedActions,
       agentMessages,
     }
+  }
+
+  async run(context: AgentContext): Promise<AgentResult> {
+    return runAgentApi(
+      this.name,
+      '你负责解释整条 Agent 决策链。基于 context 和前面已有结果，输出用户能理解的中文解释、decision rationale、必要的 suggestedActions；当 eventType 是 MORNING_BRIEF_REQUESTED 时可以生成 morningBrief。',
+      context,
+      this.buildLocalResult(context),
+    )
   }
 }

@@ -43,5 +43,5 @@ export type AgentResult = {
 
 export interface Agent {
   name: string
-  run(context: AgentContext): AgentResult
+  run(context: AgentContext): Promise<AgentResult>
 }

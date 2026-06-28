@@ -1,4 +1,5 @@
 import { BaseAgent } from '../core/BaseAgent'
+import { runAgentApi } from '../services/agentApi'
 import type { AgentContext, AgentResult, SuggestedAction } from '../types'
 
 export class StateAgent extends BaseAgent {
@@ -6,7 +7,7 @@ export class StateAgent extends BaseAgent {
     super('StateAgent')
   }
 
-  run(context: AgentContext): AgentResult {
+  private buildLocalResult(context: AgentContext): AgentResult {
     const { userState } = context
     const explanations: string[] = []
     const suggestedActions: SuggestedAction[] = []
@@ -59,5 +60,14 @@ export class StateAgent extends BaseAgent {
         ),
       ],
     }
+  }
+
+  async run(context: AgentContext): Promise<AgentResult> {
+    return runAgentApi(
+      this.name,
+      '你负责分析 userState，包括睡眠、疲劳、压力、情绪、能量和专注容量。输出状态解释、风险因素和建议动作，不要生成完整排期。',
+      context,
+      this.buildLocalResult(context),
+    )
   }
 }

@@ -16,6 +16,5 @@ export abstract class BaseAgent implements Agent {
     }
   }
 
-  abstract run(context: AgentContext): AgentResult
+  abstract run(context: AgentContext): Promise<AgentResult>
 }
-
