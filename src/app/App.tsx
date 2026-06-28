@@ -257,7 +257,7 @@ function App() {
       <header className="console-header">
         <div>
           <p className="eyebrow">24h Rhythm Agent Console</p>
-          <h1>今日节律调度控制台</h1>
+          <h1>Time Master</h1>
         </div>
         <div className="status-strip" aria-label="Console runtime status">
           <span className="system-status">
