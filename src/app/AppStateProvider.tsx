@@ -16,6 +16,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       setUserState: (userState) => dispatch({ type: 'setUserState', payload: userState }),
       insertExternalEvent: (event) =>
         dispatch({ type: 'insertExternalEvent', payload: event }),
+      insertExternalEvents: (events) =>
+        dispatch({ type: 'insertExternalEvents', payload: events }),
       updateSchedulePlan: (schedulePlan) =>
         dispatch({ type: 'updateSchedulePlan', payload: schedulePlan }),
       updateNotifications: (notifications) =>

@@ -13,6 +13,9 @@ export type ExternalEvent = {
   interruptLevel: NotificationChannel
   summary: string
   relatedTaskId?: ID
+  url?: string
+  repo?: string
+  kind?: 'issue' | 'pull_request' | 'notification' | 'review_request' | 'mention'
 }
 
 export type NotificationItem = {

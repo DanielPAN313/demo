@@ -6,7 +6,7 @@ export class StateAgent extends BaseAgent {
     super('StateAgent')
   }
 
-  run(context: AgentContext): AgentResult {
+  async run(context: AgentContext): Promise<AgentResult> {
     const { userState } = context
     const explanations: string[] = []
     const suggestedActions: SuggestedAction[] = []
@@ -50,12 +50,10 @@ export class StateAgent extends BaseAgent {
       explanations,
       suggestedActions,
       agentMessages: [
-        this.createMessage(
-          `StateAgent 已运行。检测到睡眠评分为 ${userState.sleepScore}，${
-            userState.sleepScore < 60
-              ? '今天上午会降低深度任务密度。'
-              : '当前状态可以按计划推进重点任务。'
-          }`,
+        await this.createDeepSeekMessage(
+          context,
+          'Interpret the user state and decide how fatigue, sleep, stress, and energy should affect the plan.',
+          explanations,
         ),
       ],
     }

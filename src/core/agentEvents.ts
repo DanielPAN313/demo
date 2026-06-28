@@ -3,6 +3,8 @@ import type { AgentEventType, ExternalEvent, Task, UserState } from '../types'
 export type AgentEventPayload = {
   userState?: UserState
   externalEvent?: ExternalEvent
+  externalEvents?: ExternalEvent[]
+  replaceExternalEvents?: boolean
   command?: string
   task?: Task
   timestamp?: string

@@ -1,4 +1,5 @@
-import type { Agent, AgentContext, AgentMessage, AgentResult } from '../types'
+import { createAgentCompletion } from './agentCompletion'
+import type { Agent, AgentContext, AgentMessage, AgentRunResult } from '../types'
 
 export abstract class BaseAgent implements Agent {
   readonly name: string
@@ -16,6 +17,21 @@ export abstract class BaseAgent implements Agent {
     }
   }
 
-  abstract run(context: AgentContext): AgentResult
+  protected async createDeepSeekMessage(
+    context: AgentContext,
+    responsibility: string,
+    localFindings: string[],
+  ): Promise<AgentMessage> {
+    const content = await createAgentCompletion({
+      agentName: this.name,
+      context,
+      responsibility,
+      localFindings,
+    })
+
+    return this.createMessage(content)
+  }
+
+  abstract run(context: AgentContext): AgentRunResult
 }
 

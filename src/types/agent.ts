@@ -1,9 +1,25 @@
-import type { AgentEventType, ID } from './common'
+import type { AgentEventType, ID, Priority } from './common'
 import type { ExternalEvent, NotificationItem } from './event'
 import type { FixedSchedule, SchedulePlan } from './schedule'
 import type { Task } from './task'
 import type { UserState } from './user'
 import type { MorningBrief } from '../modules/morningBrief'
+
+export type PlanningInsight = {
+  objective: string
+  taskBreakdown: string[]
+  constraints: string[]
+  conflicts: string[]
+  schedule: Array<{
+    date: string
+    startTime: string
+    endTime: string
+    title: string
+    priority: Priority
+    reason: string
+  }>
+  researchSummary?: string[]
+}
 
 export type AgentMessage = {
   id: ID
@@ -30,6 +46,7 @@ export type AgentContext = {
   currentTime: string
   eventType: AgentEventType
   userCommand?: string
+  planningInsight?: PlanningInsight
 }
 
 export type AgentResult = {
@@ -39,9 +56,12 @@ export type AgentResult = {
   explanations?: string[]
   suggestedActions?: SuggestedAction[]
   agentMessages?: AgentMessage[]
+  planningInsight?: PlanningInsight
 }
+
+export type AgentRunResult = AgentResult | Promise<AgentResult>
 
 export interface Agent {
   name: string
-  run(context: AgentContext): AgentResult
+  run(context: AgentContext): AgentRunResult
 }

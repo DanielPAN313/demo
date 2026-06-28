@@ -11,17 +11,15 @@ const createPlaceholderAgent = (name: string): Agent => ({
   }),
 })
 
-export const priorityAgent = createPlaceholderAgent('PriorityAgent')
+export const planningAgent = createPlaceholderAgent('PlanningAgent')
 export const stateAgent = createPlaceholderAgent('StateAgent')
-export const scheduleAgent = createPlaceholderAgent('ScheduleAgent')
 export const eventAgent = createPlaceholderAgent('EventAgent')
 export const interactionAgent = createPlaceholderAgent('InteractionAgent')
 export const explainAgent = createPlaceholderAgent('ExplainAgent')
 
 export const placeholderAgents: Agent[] = [
-  priorityAgent,
+  planningAgent,
   stateAgent,
-  scheduleAgent,
   eventAgent,
   interactionAgent,
   explainAgent,

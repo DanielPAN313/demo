@@ -16,7 +16,7 @@ export class EventAgent extends BaseAgent {
     super('EventAgent')
   }
 
-  run(context: AgentContext): AgentResult {
+  async run(context: AgentContext): Promise<AgentResult> {
     const sortedEvents = [...context.externalEvents].sort(byPriority)
     const highPriorityEvent = sortedEvents.find(
       (event) => (event.priority === 'P0' || event.priority === 'P1') && event.requiredAction,
@@ -45,8 +45,13 @@ export class EventAgent extends BaseAgent {
           },
         ],
         agentMessages: [
-          this.createMessage(
-            `EventAgent 已运行。我检测到一个高优先级外部事件：${githubP1Issue.title}，已准备交给排期模块处理。`,
+          await this.createDeepSeekMessage(
+            context,
+            'Classify external events by priority and explain which events should interrupt or reshape the day.',
+            [
+              `Detected GitHub P1 issue: ${githubP1Issue.title}.`,
+              `Estimated handling time: ${estimatedMinutes} minutes.`,
+            ],
           ),
         ],
       }
@@ -68,8 +73,10 @@ export class EventAgent extends BaseAgent {
           },
         ],
         agentMessages: [
-          this.createMessage(
-            `EventAgent 已运行。我检测到一个高优先级外部事件：${highPriorityEvent.title}，已准备交给排期模块处理。`,
+          await this.createDeepSeekMessage(
+            context,
+            'Classify external events by priority and explain which events should interrupt or reshape the day.',
+            [`Detected high-priority external event: ${highPriorityEvent.title}.`],
           ),
         ],
       }
@@ -80,7 +87,14 @@ export class EventAgent extends BaseAgent {
         `已汇总 ${context.externalEvents.length} 个普通外部事件，当前不需要立即触发重排。`,
       ],
       agentMessages: [
-        this.createMessage('EventAgent 已运行。外部事件已完成汇总，暂无必须立即处理的高优事件。'),
+        await this.createDeepSeekMessage(
+          context,
+          'Classify external events by priority and explain which events should interrupt or reshape the day.',
+          [
+            `Reviewed ${context.externalEvents.length} external events.`,
+            'No urgent event requires immediate rescheduling.',
+          ],
+        ),
       ],
     }
   }

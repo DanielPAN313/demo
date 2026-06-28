@@ -29,5 +29,6 @@ export type SchedulePlan = {
   blocks: ScheduleBlock[]
   summary: string
   generatedAt: string
+  horizonDays?: number
 }
 

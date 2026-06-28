@@ -12,7 +12,7 @@ export class InteractionAgent extends BaseAgent {
     super('InteractionAgent')
   }
 
-  run(context: AgentContext): AgentResult {
+  async run(context: AgentContext): Promise<AgentResult> {
     const notifications = generateNotifications(context.externalEvents, {
       currentTime: context.currentTime,
       eventType: context.eventType,
@@ -30,8 +30,13 @@ export class InteractionAgent extends BaseAgent {
         (notification) => `${notification.title}：${notification.reason}`,
       ),
       agentMessages: [
-        this.createMessage(
-          `InteractionAgent 已运行。我已将 ${notifications.length} 条外部事件分流：${immediateCount} 条立即提醒、${deferCount} 条稍后提醒、${digestCount} 条晨报汇总、${silentCount} 条静默归档。`,
+        await this.createDeepSeekMessage(
+          context,
+          'Decide how notifications should reach the user without breaking focus unnecessarily.',
+          [
+            `${notifications.length} notifications routed.`,
+            `${immediateCount} immediate, ${deferCount} deferred, ${digestCount} digest, ${silentCount} silent.`,
+          ],
         ),
       ],
     }

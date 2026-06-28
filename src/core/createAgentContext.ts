@@ -15,14 +15,26 @@ export const createAgentContext = (event?: AgentRuntimeEvent): AgentContext => {
       ? event.payload.userState
       : userStates.normal
 
-  const contextExternalEvents =
-    event?.type === 'EXTERNAL_EVENT_INSERTED' && event.payload?.externalEvent
+  const insertedExternalEvents =
+    event?.type === 'EXTERNAL_EVENT_INSERTED'
       ? [
-          event.payload.externalEvent,
-          ...externalEvents.filter(
-            (externalEvent) => externalEvent.id !== event.payload?.externalEvent?.id,
-          ),
+          ...(event.payload?.externalEvents ?? []),
+          ...(event.payload?.externalEvent ? [event.payload.externalEvent] : []),
         ]
+      : []
+  const contextExternalEvents =
+    insertedExternalEvents.length > 0
+      ? event?.payload?.replaceExternalEvents
+        ? insertedExternalEvents
+        : [
+            ...insertedExternalEvents,
+            ...externalEvents.filter(
+              (externalEvent) =>
+                !insertedExternalEvents.some(
+                  (insertedEvent) => insertedEvent.id === externalEvent.id,
+                ),
+            ),
+          ]
       : externalEvents
 
   const userCommand =

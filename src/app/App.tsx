@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AgentPanel,
   AttentionFirewall,
@@ -24,9 +25,10 @@ import {
   userStates,
 } from '../data'
 import { createAgentEvent } from '../core/agentEvents'
+import { fetchGitHubInbox, mapInboxItemToExternalEvent } from '../core/githubInboxClient'
 import { runAgentPipeline } from '../core/runAgentPipeline'
 import type { AgentRuntimeEvent } from '../core/agentEvents'
-import type { NotificationChannel } from '../types'
+import type { AgentResult, NotificationChannel } from '../types'
 import { useAppState } from './appStateContext'
 
 const firewallRouteByChannel = {
@@ -91,8 +93,28 @@ const createEventFromAction = (action: DemoAction): AgentRuntimeEvent => {
   }
 }
 
+const demoActions: DemoAction[] = [
+  { id: 'toggleGithubWatch', label: 'Watch GitHub', description: '每 1 分钟静默检查新通知' },
+  { id: 'syncGithubInbox', label: 'Sync GitHub Inbox', description: '拉取账号级 issue / PR / mentions' },
+  { id: 'poorSleep', label: '睡眠差', description: '降低上午深度任务密度' },
+  { id: 'highStress', label: '压力高', description: '延后强沟通任务' },
+  { id: 'githubP1', label: '插入 GitHub P1', description: '触发突发事件解释' },
+  { id: 'nightMode', label: '进入夜间模式', description: '普通通知静默归档' },
+  { id: 'morningBrief', label: '生成晨报', description: '汇总夜间事件和今日建议' },
+  { id: 'reset', label: '重置演示', description: '回到初始状态', variant: 'secondary' },
+]
+
+type ApplyAgentResultOptions = {
+  compactChat?: boolean
+}
+
 function App() {
   const { state, actions } = useAppState()
+  const [isAgentRunning, setIsAgentRunning] = useState(false)
+  const [isGitHubWatching, setIsGitHubWatching] = useState(false)
+  const [githubWatchStatus, setGitHubWatchStatus] = useState('GitHub watch off')
+  const seenGitHubItemIdsRef = useRef<Set<string>>(new Set())
+  const isGitHubWatchCheckingRef = useRef(false)
   const activeSchedulePlan = state.schedulePlan ?? initialSchedulePlan
   const activeNotifications =
     state.notifications.length > 0 ? state.notifications : initialNotifications
@@ -104,9 +126,99 @@ function App() {
     text: message.content,
   }))
 
+  const applyAgentResult = useCallback((
+    result: AgentResult,
+    options: ApplyAgentResultOptions = {},
+  ) => {
+    if (result.schedulePlan) {
+      actions.updateSchedulePlan(result.schedulePlan)
+    }
+
+    if (result.notifications) {
+      actions.updateNotifications(result.notifications)
+    }
+
+    if (result.morningBrief) {
+      actions.updateMorningBrief(result.morningBrief)
+    }
+
+    if (result.suggestedActions) {
+      actions.updateSuggestedActions(result.suggestedActions)
+    }
+
+    const agentMessages = result.agentMessages ?? []
+    const visibleAgentMessages =
+      options.compactChat && agentMessages.length > 0
+        ? [agentMessages[agentMessages.length - 1]]
+        : agentMessages
+    const visibleExplanations = options.compactChat ? [] : result.explanations ?? []
+    const messages = [
+      ...visibleAgentMessages.map((message) => ({
+        role: message.role,
+        content: message.content,
+      })),
+      ...visibleExplanations.map((explanation) => ({
+        role: 'agent' as const,
+        content: `解释：${explanation}`,
+      })),
+    ]
+
+    if (messages.length > 0) {
+      actions.addAgentMessages(messages)
+    }
+  }, [actions])
+
+  const runPipelineAndApply = async (
+    event: AgentRuntimeEvent,
+    options?: ApplyAgentResultOptions,
+  ) => {
+    setIsAgentRunning(true)
+
+    try {
+      const result = await runAgentPipeline(event)
+      applyAgentResult(result, options)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown DeepSeek error'
+
+      actions.addAgentMessages([
+        {
+          role: 'system',
+          content: `DeepSeek API 调用失败：${message}`,
+        },
+      ])
+    } finally {
+      setIsAgentRunning(false)
+    }
+  }
+
+  const visibleDemoActions = useMemo(
+    () =>
+      demoActions.map((action) =>
+        action.id === 'toggleGithubWatch'
+          ? {
+              ...action,
+              label: isGitHubWatching ? 'Stop GitHub Watch' : 'Watch GitHub',
+              description: githubWatchStatus,
+              variant: isGitHubWatching ? ('secondary' as const) : action.variant,
+            }
+          : action,
+      ),
+    [githubWatchStatus, isGitHubWatching],
+  )
+
   const handleDemoAction = (action: DemoAction) => {
     if (action.id === 'reset') {
       actions.resetDemo()
+      return
+    }
+
+    if (action.id === 'syncGithubInbox') {
+      void handleSyncGitHubInbox()
+      return
+    }
+
+    if (action.id === 'toggleGithubWatch') {
+      setIsGitHubWatching((current) => !current)
       return
     }
 
@@ -127,38 +239,128 @@ function App() {
       actions.switchScenario(scenario)
     }
 
-    const result = runAgentPipeline(createEventFromAction(action))
+    void runPipelineAndApply(createEventFromAction(action))
+  }
 
-    if (result.schedulePlan) {
-      actions.updateSchedulePlan(result.schedulePlan)
+  const handleSyncGitHubInbox = async () => {
+    setIsAgentRunning(true)
+
+    try {
+      const inbox = await fetchGitHubInbox()
+      const events = inbox.items.map(mapInboxItemToExternalEvent)
+
+      seenGitHubItemIdsRef.current = new Set(inbox.items.map((item) => item.id))
+      setGitHubWatchStatus(
+        `Last checked ${new Date(inbox.fetchedAt).toLocaleTimeString()} · ${inbox.counts.merged} items`,
+      )
+      actions.insertExternalEvents(events)
+      actions.addAgentMessages([
+        {
+          role: 'system',
+          content: `GitHub Inbox synced: ${inbox.counts.merged} related items (${inbox.counts.notifications} notifications, ${inbox.counts.assigned} assigned, ${inbox.counts.reviewRequested} review requests).`,
+        },
+      ])
+
+      const result = await runAgentPipeline(
+        createAgentEvent('EXTERNAL_EVENT_INSERTED', {
+          externalEvents: events,
+          replaceExternalEvents: true,
+          timestamp: inbox.fetchedAt,
+        }),
+      )
+      applyAgentResult(result, { compactChat: true })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown GitHub error'
+
+      actions.addAgentMessages([
+        {
+          role: 'system',
+          content: `GitHub Inbox sync failed: ${message}`,
+        },
+      ])
+    } finally {
+      setIsAgentRunning(false)
+    }
+  }
+
+  const checkGitHubInboxForNewItems = useCallback(async (isInitial = false) => {
+    if (isGitHubWatchCheckingRef.current) return
+
+    isGitHubWatchCheckingRef.current = true
+
+    try {
+      const inbox = await fetchGitHubInbox()
+      const knownIds = seenGitHubItemIdsRef.current
+      const newItems = isInitial
+        ? []
+        : inbox.items.filter((item) => !knownIds.has(item.id))
+
+      seenGitHubItemIdsRef.current = new Set(inbox.items.map((item) => item.id))
+      setGitHubWatchStatus(
+        `Connected · last checked ${new Date(inbox.fetchedAt).toLocaleTimeString()} · ${inbox.counts.merged} items`,
+      )
+
+      if (newItems.length === 0) return
+
+      const events = newItems.map(mapInboxItemToExternalEvent)
+
+      actions.insertExternalEvents(events)
+      actions.addAgentMessages([
+        {
+          role: 'system',
+          content: `GitHub Watch found ${newItems.length} new item${newItems.length > 1 ? 's' : ''}.`,
+        },
+      ])
+
+      const result = await runAgentPipeline(
+        createAgentEvent('EXTERNAL_EVENT_INSERTED', {
+          externalEvents: events,
+          replaceExternalEvents: true,
+          timestamp: inbox.fetchedAt,
+        }),
+      )
+
+      applyAgentResult(result, { compactChat: true })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown GitHub watch error'
+
+      setGitHubWatchStatus(`GitHub watch error: ${message}`)
+    } finally {
+      isGitHubWatchCheckingRef.current = false
+    }
+  }, [actions, applyAgentResult])
+
+  useEffect(() => {
+    if (!isGitHubWatching) {
+      setGitHubWatchStatus('GitHub watch off')
+      return undefined
     }
 
-    if (result.notifications) {
-      actions.updateNotifications(result.notifications)
-    }
+    setGitHubWatchStatus('Connecting GitHub watch...')
+    void checkGitHubInboxForNewItems(true)
 
-    if (result.morningBrief) {
-      actions.updateMorningBrief(result.morningBrief)
-    }
+    const intervalId = window.setInterval(() => {
+      void checkGitHubInboxForNewItems()
+    }, 60_000)
 
-    if (result.suggestedActions) {
-      actions.updateSuggestedActions(result.suggestedActions)
-    }
+    return () => window.clearInterval(intervalId)
+  }, [checkGitHubInboxForNewItems, isGitHubWatching])
 
-    const messages = [
-      ...(result.agentMessages ?? []).map((message) => ({
-        role: message.role,
-        content: message.content,
-      })),
-      ...(result.explanations ?? []).map((explanation) => ({
-        role: 'agent' as const,
-        content: `解释：${explanation}`,
-      })),
-    ]
+  const handleSendMessage = (message: string) => {
+    actions.addAgentMessages([
+      {
+        role: 'user',
+        content: message,
+      },
+    ])
 
-    if (messages.length > 0) {
-      actions.addAgentMessages(messages)
-    }
+    void runPipelineAndApply(
+      createAgentEvent('USER_COMMAND', {
+        command: message,
+        timestamp: new Date().toISOString(),
+      }),
+      { compactChat: true },
+    )
   }
 
   const timelineItems: TimelineItem[] = activeSchedulePlan.blocks.map((block) => ({
@@ -244,7 +446,9 @@ function App() {
             }}
           />
           <AgentPanel
+            isSending={isAgentRunning}
             messages={panelMessages}
+            onSendMessage={handleSendMessage}
             suggestedActions={state.suggestedActions}
             explanation={
               panelMessages.at(-1)?.text ?? 'Agent 输出会在点击演示按钮后追加到这里。'
@@ -265,7 +469,11 @@ function App() {
 
         <aside className="layout-right">
           <AttentionFirewall items={firewallItems} />
-          <DemoControls activeActionId={state.currentScenario} onAction={handleDemoAction} />
+          <DemoControls
+            actions={visibleDemoActions}
+            activeActionId={state.currentScenario}
+            onAction={handleDemoAction}
+          />
         </aside>
       </section>
     </main>

@@ -8,16 +8,15 @@ Recommended initial files:
 - `AgentOrchestrator.ts`: top-level agent coordinator. It currently returns a mock result.
 - `placeholderAgents.ts`: empty placeholders for planned sub-agents.
 - `rhythmAgent.ts`: main rhythm scheduling agent.
-- `priorityAgent.ts`: ranks tasks and events.
+- `PlanningAgent.ts`: ranks tasks, builds the day schedule, and explains the plan.
 - `briefingAgent.ts`: builds morning/evening summaries.
 - `notificationAgent.ts`: decides when and how to surface updates.
 - `agentRegistry.ts`: central place to register available agents.
 
 Planned agent chain:
 
-- `PriorityAgent`
+- `PlanningAgent`
 - `StateAgent`
-- `ScheduleAgent`
 - `EventAgent`
 - `InteractionAgent`
 - `ExplainAgent`

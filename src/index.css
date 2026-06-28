@@ -426,8 +426,40 @@ h2 {
 }
 
 .chat-input {
-  border: 1px dashed #aeb8c6;
+  display: flex;
+  gap: 8px;
+  border: 1px solid #aeb8c6;
+  color: var(--text);
+}
+
+.chat-input input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  outline: none;
+}
+
+.chat-input input::placeholder {
   color: var(--muted);
+}
+
+.chat-input button {
+  min-height: 32px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--ink);
+  color: #ffffff;
+  cursor: pointer;
+  font-weight: 800;
+  padding: 0 12px;
+}
+
+.chat-input button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .agent-explain {

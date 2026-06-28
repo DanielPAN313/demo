@@ -1,3 +1,4 @@
+import { useState, type FormEvent } from 'react'
 import type { SuggestedAction } from '../types'
 
 export type AgentMessage = {
@@ -11,6 +12,8 @@ export type AgentPanelProps = {
   suggestion?: string
   messages?: AgentMessage[]
   suggestedActions?: SuggestedAction[]
+  isSending?: boolean
+  onSendMessage?: (message: string) => void | Promise<void>
 }
 
 const defaultMessages: AgentMessage[] = [
@@ -29,7 +32,21 @@ export function AgentPanel({
   suggestion = 'Move lightweight tasks into the next micro-slot and keep P1 demo work visible.',
   messages = defaultMessages,
   suggestedActions = [],
+  isSending = false,
+  onSendMessage,
 }: AgentPanelProps) {
+  const [draft, setDraft] = useState('')
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const message = draft.trim()
+
+    if (!message || isSending) return
+
+    setDraft('')
+    void onSendMessage?.(message)
+  }
+
   return (
     <section className="panel agent-chat-panel" aria-labelledby="agent-panel-title">
       <div className="panel-title">
@@ -67,9 +84,18 @@ export function AgentPanel({
             {message.text}
           </div>
         ))}
-        <div className="chat-input" aria-label="Agent chat placeholder">
-          Ask the rhythm agent...
-        </div>
+        <form className="chat-input" aria-label="Agent chat input" onSubmit={handleSubmit}>
+          <input
+            disabled={isSending}
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder={isSending ? 'Thinking...' : 'Ask the rhythm agent...'}
+            type="text"
+            value={draft}
+          />
+          <button disabled={isSending || draft.trim().length === 0} type="submit">
+            Send
+          </button>
+        </form>
       </div>
     </section>
   )

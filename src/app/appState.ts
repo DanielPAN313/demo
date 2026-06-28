@@ -34,6 +34,7 @@ export type AppState = {
 export type AppAction =
   | { type: 'setUserState'; payload: UserState }
   | { type: 'insertExternalEvent'; payload: ExternalEvent }
+  | { type: 'insertExternalEvents'; payload: ExternalEvent[] }
   | { type: 'updateSchedulePlan'; payload: SchedulePlan }
   | { type: 'updateNotifications'; payload: NotificationItem[] }
   | { type: 'updateMorningBrief'; payload: MorningBrief }
@@ -46,6 +47,7 @@ export type AppAction =
 export type AppStateActions = {
   setUserState: (userState: UserState) => void
   insertExternalEvent: (event: ExternalEvent) => void
+  insertExternalEvents: (events: ExternalEvent[]) => void
   updateSchedulePlan: (schedulePlan: SchedulePlan) => void
   updateNotifications: (notifications: NotificationItem[]) => void
   updateMorningBrief: (morningBrief: MorningBrief) => void
@@ -127,6 +129,17 @@ export const appStateReducer = (state: AppState, action: AppAction): AppState =>
       return {
         ...state,
         externalEvents: [...state.externalEvents, action.payload],
+      }
+    case 'insertExternalEvents':
+      return {
+        ...state,
+        externalEvents: [
+          ...action.payload,
+          ...state.externalEvents.filter(
+            (event) =>
+              !action.payload.some((payloadEvent) => payloadEvent.id === event.id),
+          ),
+        ],
       }
     case 'updateSchedulePlan':
       return {
