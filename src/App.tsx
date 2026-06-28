@@ -16,7 +16,8 @@ import {
   Zap,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import type { ReactNode } from 'react'
+import { useRef } from 'react'
+import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react'
 import './App.css'
 import { userStates } from './data/mockData'
 import { runAgentOrchestrator } from './core/orchestrator'
@@ -63,11 +64,105 @@ type WeekEvent = {
   type: ScheduleType
 }
 
+let activeScrollFrame = 0
+type PageTransitionPhase = 'fade' | 'slide' | null
+
 function App() {
   const [scenario, setScenario] = useState<DemoScenario>('normal')
   const [showAdjuster, setShowAdjuster] = useState(false)
+  const [activeNav, setActiveNav] = useState('mission-deck')
+  const [secondaryPageVisible, setSecondaryPageVisible] = useState(false)
+  const [transitionPhase, setTransitionPhase] = useState<PageTransitionPhase>(null)
+  const navLockUntilRef = useRef(0)
+  const transitionTimersRef = useRef<number[]>([])
+  const pendingTargetRef = useRef('timeline-title')
   const result = useMemo(() => runAgentOrchestrator(scenario), [scenario])
   const state = userStates[scenario]
+
+  useEffect(() => {
+    if (!showAdjuster || secondaryPageVisible) return undefined
+
+    const sectionIds = ['mission-deck', 'command-title', 'timeline-title', 'firewall-title', 'agent-title']
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visibleEntry = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((first, second) => second.intersectionRatio - first.intersectionRatio)[0]
+        if (performance.now() < navLockUntilRef.current) return
+        if (visibleEntry?.target.id) setActiveNav(visibleEntry.target.id)
+      },
+      {
+        rootMargin: '-24% 0px -58% 0px',
+        threshold: [0.12, 0.32, 0.56],
+      },
+    )
+
+    sectionIds.forEach((id) => {
+      const element = document.getElementById(id)
+      if (element) observer.observe(element)
+    })
+
+    return () => observer.disconnect()
+  }, [showAdjuster, secondaryPageVisible])
+
+  useEffect(
+    () => () => {
+      transitionTimersRef.current.forEach((timer) => window.clearTimeout(timer))
+    },
+    [],
+  )
+
+  const openScenarioPage = (nextScenario: DemoScenario, targetId = 'timeline-title') => {
+    transitionTimersRef.current.forEach((timer) => window.clearTimeout(timer))
+    transitionTimersRef.current = []
+    pendingTargetRef.current = targetId
+    setScenario(nextScenario)
+    setActiveNav(targetId)
+    setTransitionPhase('fade')
+    window.history.replaceState(null, '', `#${targetId}`)
+
+    const revealTimer = window.setTimeout(() => {
+      setSecondaryPageVisible(true)
+      setTransitionPhase('slide')
+      window.scrollTo(0, 0)
+    }, 360)
+
+    const settleTimer = window.setTimeout(() => {
+      setTransitionPhase(null)
+    }, 1180)
+
+    transitionTimersRef.current = [revealTimer, settleTimer]
+  }
+
+  const returnHome = () => {
+    transitionTimersRef.current.forEach((timer) => window.clearTimeout(timer))
+    transitionTimersRef.current = []
+    setTransitionPhase('fade')
+    window.history.replaceState(null, '', '#mission-deck')
+
+    const revealTimer = window.setTimeout(() => {
+      setSecondaryPageVisible(false)
+      setActiveNav('mission-deck')
+      setTransitionPhase('slide')
+      window.scrollTo(0, 0)
+    }, 320)
+
+    const settleTimer = window.setTimeout(() => {
+      setTransitionPhase(null)
+    }, 980)
+
+    transitionTimersRef.current = [revealTimer, settleTimer]
+  }
+
+  const handleNavJump = (targetId: string) => {
+    if (!secondaryPageVisible && targetId !== 'mission-deck' && targetId !== 'command-title') {
+      openScenarioPage(scenario, targetId)
+      return
+    }
+    navLockUntilRef.current = performance.now() + 1100
+    setActiveNav(targetId)
+    scrollToSectionWithBezier(targetId)
+  }
 
   if (!showAdjuster) {
     return (
@@ -79,137 +174,202 @@ function App() {
   }
 
   return (
-    <main className="app-shell" data-scenario={scenario}>
-      <aside className="sidebar" aria-label="主导航">
-        <div className="brand-card">
-          <div className="system-mark" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-            <span />
-          </div>
-          <div>
-            <strong>time master</strong>
-            <span>life rhythm OS</span>
-          </div>
-        </div>
-
-        <nav className="sidebar-nav">
-          <a data-active="true" href="#timeline-title">
-            <LayoutDashboard aria-hidden="true" />
-            <span>Mission Deck</span>
-          </a>
-          <a href="#timeline-title">
-            <CalendarClock aria-hidden="true" />
-            <span>Rhythm Map</span>
-          </a>
-          <a href="#firewall-title">
-            <ShieldCheck aria-hidden="true" />
-            <span>Focus Gate</span>
-          </a>
-          <a href="#agent-title">
-            <Sparkles aria-hidden="true" />
-            <span>Agent Pulse</span>
-          </a>
-          <a href="#command-title">
-            <Command aria-hidden="true" />
-            <span>Adjust Lab</span>
-          </a>
-        </nav>
-
-        <div className="sidebar-note">
-          <span>Live Context</span>
-          <strong>{result.stateLabel}</strong>
-        </div>
-      </aside>
-
-      <div className="workspace">
-        <header className="topbar">
-          <div className="identity-lockup">
+    <main
+      className="app-shell"
+      data-page={secondaryPageVisible ? 'detail' : 'home'}
+      data-scenario={scenario}
+    >
+      {transitionPhase && <div className="page-transition" data-phase={transitionPhase} />}
+      {!secondaryPageVisible && (
+        <aside className="sidebar" aria-label="主导航">
+          <div className="brand-card">
+            <div className="system-mark" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+              <span />
+            </div>
             <div>
-              <p className="eyebrow">time master cockpit</p>
-              <h1>个人时间 Agent 调整舱</h1>
+              <strong>time master</strong>
+              <span>life rhythm OS</span>
             </div>
           </div>
-          <div className="status-strip" aria-label="用户状态">
-            <Metric label="睡眠" value={state.sleepScore} />
-            <Metric label="精力" value={state.energyLevel} />
-            <Metric label="压力" value={state.stressLevel} inverse />
-          </div>
-        </header>
 
-        <section className="command-dock" aria-labelledby="command-title">
-          <div className="command-copy">
-            <p className="eyebrow">Adjust lab</p>
-            <h2 id="command-title">今天怎么调整？</h2>
-            <p>把睡眠、任务、突发消息重新折叠成一个可执行的生活节律。</p>
-          </div>
-          <div className="command-input" aria-label="Agent 指令输入示例">
-            <Command aria-hidden="true" />
-            <span>
-              {scenario === 'githubP1'
-                ? '插入 GitHub P1，并保护下午主线任务'
-                : scenario === 'sleepPoor'
-                  ? '我昨晚没睡好，帮我降强度'
-                  : scenario === 'morningBrief'
-                    ? '生成晨报，告诉我今天要确认什么'
-                    : '生成今天的 Agent 排期建议'}
-            </span>
-            <kbd>⌘K</kbd>
-          </div>
-        </section>
-
-        <ScenarioControls scenario={scenario} setScenario={setScenario} />
-
-        <section className="dashboard-grid">
-          <Timeline blocks={result.updatedSchedule} />
-
-          <section className="agent-panel" aria-labelledby="agent-title">
-            <div className="panel-heading">
-              <div>
-                <p className="eyebrow">Agent Pulse</p>
-                <h2 id="agent-title">{result.stateLabel}</h2>
-              </div>
+          <nav className="sidebar-nav">
+            <a
+              data-active={activeNav === 'mission-deck'}
+              href="#mission-deck"
+              onClick={(event) => {
+                event.preventDefault()
+                handleNavJump('mission-deck')
+              }}
+            >
+              <LayoutDashboard aria-hidden="true" />
+              <span>Mission Deck</span>
+            </a>
+            <a
+              data-active={activeNav === 'timeline-title'}
+              href="#timeline-title"
+              onClick={(event) => {
+                event.preventDefault()
+                handleNavJump('timeline-title')
+              }}
+            >
+              <CalendarClock aria-hidden="true" />
+              <span>Rhythm Map</span>
+            </a>
+            <a
+              data-active={activeNav === 'firewall-title'}
+              href="#firewall-title"
+              onClick={(event) => {
+                event.preventDefault()
+                handleNavJump('firewall-title')
+              }}
+            >
+              <ShieldCheck aria-hidden="true" />
+              <span>Focus Gate</span>
+            </a>
+            <a
+              data-active={activeNav === 'agent-title'}
+              href="#agent-title"
+              onClick={(event) => {
+                event.preventDefault()
+                handleNavJump('agent-title')
+              }}
+            >
               <Sparkles aria-hidden="true" />
-            </div>
+              <span>Agent Pulse</span>
+            </a>
+            <a
+              data-active={activeNav === 'command-title'}
+              href="#command-title"
+              onClick={(event) => {
+                event.preventDefault()
+                handleNavJump('command-title')
+              }}
+            >
+              <Command aria-hidden="true" />
+              <span>Adjust Lab</span>
+            </a>
+          </nav>
 
-            <div className="message-stack">
-              {result.agentMessages.map((message) => (
-                <article className="agent-message" key={message.agent}>
-                  <span>{message.agent}</span>
-                  <p>{message.text}</p>
-                </article>
-              ))}
-            </div>
+          <div className="sidebar-note">
+            <span>Live Context</span>
+            <strong>{result.stateLabel}</strong>
+          </div>
+        </aside>
+      )}
 
-            <AgentTrace scenario={scenario} />
-
-            <div className="explain-list">
-            <h3>Decision Trace</h3>
-              {result.explanations.map((item) => (
-                <p key={item}>{item}</p>
-              ))}
-            </div>
-
-            <div className="action-list">
-            <h3>Next Moves</h3>
-              {result.suggestedActions.map((item) => (
-                <span key={item}>{item}</span>
-              ))}
-            </div>
-
-            {result.morningBrief.length > 0 && (
-              <div className="brief-box">
-              <h3>Morning Signal</h3>
-                {result.morningBrief.map((item) => (
-                  <p key={item}>{item}</p>
-                ))}
+      <div className="workspace" data-page={secondaryPageVisible ? 'detail' : 'home'}>
+        {!secondaryPageVisible && (
+          <>
+            <header className="topbar" id="mission-deck">
+              <div className="identity-lockup">
+                <div>
+                  <p className="eyebrow">time master cockpit</p>
+                  <h1>个人时间 Agent 调整舱</h1>
+                </div>
               </div>
-            )}
-          </section>
+              <div className="status-strip" aria-label="用户状态">
+                <Metric label="睡眠" value={state.sleepScore} />
+                <Metric label="精力" value={state.energyLevel} />
+                <Metric label="压力" value={state.stressLevel} inverse />
+              </div>
+            </header>
 
-          <Firewall notifications={result.notifications} />
-        </section>
+            <section className="command-dock" aria-labelledby="command-title">
+              <div className="command-copy">
+                <p className="eyebrow">Adjust lab</p>
+                <h2 id="command-title">今天怎么调整？</h2>
+                <p>把睡眠、任务、突发消息重新折叠成一个可执行的生活节律。</p>
+              </div>
+              <div className="command-input" aria-label="Agent 指令输入示例">
+                <Command aria-hidden="true" />
+                <span>
+                  {scenario === 'githubP1'
+                    ? '插入 GitHub P1，并保护下午主线任务'
+                    : scenario === 'sleepPoor'
+                      ? '我昨晚没睡好，帮我降强度'
+                      : scenario === 'morningBrief'
+                        ? '生成晨报，告诉我今天要确认什么'
+                        : '生成今天的 Agent 排期建议'}
+                </span>
+                <kbd>⌘K</kbd>
+              </div>
+            </section>
+
+            <ScenarioControls scenario={scenario} onScenarioSelect={openScenarioPage} />
+          </>
+        )}
+
+        {secondaryPageVisible && (
+          <section
+            className="detail-page"
+            data-entering={transitionPhase === 'slide'}
+            aria-label={`${scenarioLabels[scenario]} 二级页面`}
+          >
+            <header className="detail-hero">
+              <div>
+                <p className="eyebrow">time master second layer</p>
+                <h1>{scenarioLabels[scenario]}</h1>
+                <span>{result.stateLabel}</span>
+              </div>
+              <button className="detail-home-button" onClick={returnHome} type="button">
+                主页入口
+              </button>
+            </header>
+
+            <section className="dashboard-grid">
+              <Timeline blocks={result.updatedSchedule} />
+
+              <section className="agent-panel" aria-labelledby="agent-title">
+                <div className="panel-heading">
+                  <div>
+                    <p className="eyebrow">Agent Pulse</p>
+                    <h2 id="agent-title">{result.stateLabel}</h2>
+                  </div>
+                  <Sparkles aria-hidden="true" />
+                </div>
+
+                <div className="message-stack">
+                  {result.agentMessages.map((message) => (
+                    <article className="agent-message" key={message.agent}>
+                      <span>{message.agent}</span>
+                      <p>{message.text}</p>
+                    </article>
+                  ))}
+                </div>
+
+                <AgentTrace scenario={scenario} />
+
+                <div className="explain-list">
+                  <h3>Decision Trace</h3>
+                  {result.explanations.map((item) => (
+                    <p key={item}>{item}</p>
+                  ))}
+                </div>
+
+                <div className="action-list">
+                  <h3>Next Moves</h3>
+                  {result.suggestedActions.map((item) => (
+                    <span key={item}>{item}</span>
+                  ))}
+                </div>
+
+                {result.morningBrief.length > 0 && (
+                  <div className="brief-box">
+                    <h3>Morning Signal</h3>
+                    {result.morningBrief.map((item) => (
+                      <p key={item}>{item}</p>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              <Firewall notifications={result.notifications} />
+            </section>
+          </section>
+        )}
 
       </div>
     </main>
@@ -218,10 +378,10 @@ function App() {
 
 function ScenarioControls({
   scenario,
-  setScenario,
+  onScenarioSelect,
 }: {
   scenario: DemoScenario
-  setScenario: (scenario: DemoScenario) => void
+  onScenarioSelect: (scenario: DemoScenario) => void
 }) {
   return (
     <section className="command-bar" aria-label="Demo 场景">
@@ -229,37 +389,37 @@ function ScenarioControls({
         active={scenario === 'normal'}
         icon={<RotateCcw aria-hidden="true" />}
         label={scenarioLabels.normal}
-        onClick={() => setScenario('normal')}
+        onClick={() => onScenarioSelect('normal')}
       />
       <ScenarioButton
         active={scenario === 'sleepPoor'}
         icon={<Zap aria-hidden="true" />}
         label={scenarioLabels.sleepPoor}
-        onClick={() => setScenario('sleepPoor')}
+        onClick={() => onScenarioSelect('sleepPoor')}
       />
       <ScenarioButton
         active={scenario === 'stressHigh'}
         icon={<ShieldCheck aria-hidden="true" />}
         label={scenarioLabels.stressHigh}
-        onClick={() => setScenario('stressHigh')}
+        onClick={() => onScenarioSelect('stressHigh')}
       />
       <ScenarioButton
         active={scenario === 'githubP1'}
         icon={<GitBranch aria-hidden="true" />}
         label={scenarioLabels.githubP1}
-        onClick={() => setScenario('githubP1')}
+        onClick={() => onScenarioSelect('githubP1')}
       />
       <ScenarioButton
         active={scenario === 'nightMode'}
         icon={<Moon aria-hidden="true" />}
         label={scenarioLabels.nightMode}
-        onClick={() => setScenario('nightMode')}
+        onClick={() => onScenarioSelect('nightMode')}
       />
       <ScenarioButton
         active={scenario === 'morningBrief'}
         icon={<Sunrise aria-hidden="true" />}
         label={scenarioLabels.morningBrief}
-        onClick={() => setScenario('morningBrief')}
+        onClick={() => onScenarioSelect('morningBrief')}
       />
     </section>
   )
@@ -394,6 +554,60 @@ function IntroMotion() {
   )
 }
 
+function scrollToSectionWithBezier(targetId: string) {
+  const target = document.getElementById(targetId)
+  if (!target) return
+
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  const start = window.scrollY
+  const targetY = target.getBoundingClientRect().top + window.scrollY - 24
+  const distance = targetY - start
+
+  window.history.replaceState(null, '', `#${targetId}`)
+
+  if (prefersReducedMotion || Math.abs(distance) < 2) {
+    window.scrollTo(0, targetY)
+    return
+  }
+
+  const duration = Math.min(980, Math.max(520, Math.abs(distance) * 0.62))
+  const ease = createCubicBezier(0.22, 1, 0.36, 1)
+  const startTime = performance.now()
+
+  if (activeScrollFrame) cancelAnimationFrame(activeScrollFrame)
+
+  const animate = (now: number) => {
+    const progress = Math.min(1, (now - startTime) / duration)
+    window.scrollTo(0, start + distance * ease(progress))
+    if (progress < 1) {
+      activeScrollFrame = requestAnimationFrame(animate)
+    } else {
+      activeScrollFrame = 0
+    }
+  }
+
+  activeScrollFrame = requestAnimationFrame(animate)
+}
+
+function createCubicBezier(x1: number, y1: number, x2: number, y2: number) {
+  const sampleCurveX = (time: number) =>
+    ((1 - 3 * x2 + 3 * x1) * time + (3 * x2 - 6 * x1)) * time * time + 3 * x1 * time
+  const sampleCurveY = (time: number) =>
+    ((1 - 3 * y2 + 3 * y1) * time + (3 * y2 - 6 * y1)) * time * time + 3 * y1 * time
+  const sampleCurveDerivativeX = (time: number) =>
+    (3 * (1 - 3 * x2 + 3 * x1) * time + 2 * (3 * x2 - 6 * x1)) * time + 3 * x1
+
+  return (progress: number) => {
+    let time = progress
+    for (let index = 0; index < 5; index += 1) {
+      const slope = sampleCurveDerivativeX(time)
+      if (Math.abs(slope) < 0.001) break
+      time -= (sampleCurveX(time) - progress) / slope
+    }
+    return sampleCurveY(Math.min(1, Math.max(0, time)))
+  }
+}
+
 function AgentTrace({ scenario }: { scenario: DemoScenario }) {
   const agents = [
     { id: 'priority', label: 'Priority', active: true },
@@ -466,6 +680,12 @@ function Timeline({ blocks }: { blocks: ScheduleBlock[] }) {
     startTime: '14:00',
     title: '',
   })
+  const [draggingEventId, setDraggingEventId] = useState<string | null>(null)
+  const [dropPreview, setDropPreview] = useState<{ day: number; top: number } | null>(null)
+  const dayGridRef = useRef<HTMLDivElement | null>(null)
+  const dragCandidateRef = useRef<{ id: string; startX: number; startY: number } | null>(null)
+  const dragMovedRef = useRef(false)
+  const cleanupDragRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
     setEventBlocks(buildWeekEvents(blocks))
@@ -507,6 +727,87 @@ function Timeline({ blocks }: { blocks: ScheduleBlock[] }) {
     setEditingEventId(null)
   }
 
+  const getDropPosition = (event: { clientX: number; clientY: number }) => {
+    const grid = dayGridRef.current
+    if (!grid) return null
+
+    const rect = grid.getBoundingClientRect()
+    const x = Math.min(Math.max(event.clientX - rect.left, 0), rect.width - 1)
+    const y = Math.min(Math.max(event.clientY - rect.top, 0), rect.height - 1)
+    const day = Math.min(6, Math.max(0, Math.floor((x / rect.width) * 7)))
+    const top = Math.min(20, Math.max(1, Math.floor((y / rect.height) * 20) + 1))
+
+    return { day, top }
+  }
+
+  const moveEventToPosition = (eventId: string, position: { day: number; top: number }) => {
+    setEventBlocks((events) =>
+      events.map((item) => {
+        if (item.id !== eventId) return item
+        const startMinutes = topToMinutes(position.top)
+        const duration = timeToMinutes(item.endTime) - timeToMinutes(item.startTime)
+        const safeDuration = Math.max(30, duration)
+        const endMinutes = Math.min(24 * 60, startMinutes + safeDuration)
+
+        return normalizeWeekEvent({
+          ...item,
+          day: position.day,
+          endTime: minutesToTime(endMinutes),
+          startTime: minutesToTime(startMinutes),
+        })
+      }),
+    )
+    setEditingEventId(null)
+  }
+
+  const startMouseDrag = (event: ReactMouseEvent<HTMLButtonElement>, eventId: string) => {
+    if (cleanupDragRef.current) cleanupDragRef.current()
+
+    dragCandidateRef.current = { id: eventId, startX: event.clientX, startY: event.clientY }
+    dragMovedRef.current = false
+
+    const updateDrag = (moveEvent: MouseEvent) => {
+      const candidate = dragCandidateRef.current
+      if (!candidate) return
+
+      const distance = Math.hypot(
+        moveEvent.clientX - candidate.startX,
+        moveEvent.clientY - candidate.startY,
+      )
+      if (distance < 6 && !dragMovedRef.current) return
+
+      dragMovedRef.current = true
+      setDraggingEventId(candidate.id)
+      const position = getDropPosition(moveEvent)
+      if (position) setDropPreview(position)
+    }
+
+    const finishDrag = (upEvent: MouseEvent) => {
+      const candidate = dragCandidateRef.current
+      const position = getDropPosition(upEvent)
+
+      if (candidate && dragMovedRef.current && position) {
+        moveEventToPosition(candidate.id, position)
+        upEvent.preventDefault()
+      }
+
+      cleanupDragRef.current?.()
+    }
+
+    cleanupDragRef.current = () => {
+      window.removeEventListener('mousemove', updateDrag)
+      window.removeEventListener('mouseup', finishDrag)
+      dragCandidateRef.current = null
+      setDraggingEventId(null)
+      setDropPreview(null)
+    }
+
+    window.addEventListener('mousemove', updateDrag)
+    window.addEventListener('mouseup', finishDrag, { once: true })
+  }
+
+  useEffect(() => () => cleanupDragRef.current?.(), [])
+
   return (
     <section className="timeline-panel" aria-labelledby="timeline-title">
       <div className="panel-heading">
@@ -543,7 +844,11 @@ function Timeline({ blocks }: { blocks: ScheduleBlock[] }) {
               <span key={hour}>{hour}</span>
             ))}
           </div>
-          <div className="day-grid">
+          <div
+            className="day-grid"
+            data-dragging={draggingEventId ? 'true' : undefined}
+            ref={dayGridRef}
+          >
             {weekDays.map((day) => (
               <div className="day-column" key={day.week}>
                 {hours.map((hour) => (
@@ -551,13 +856,34 @@ function Timeline({ blocks }: { blocks: ScheduleBlock[] }) {
                 ))}
               </div>
             ))}
+            {dropPreview && draggingEventId && (
+              <div
+                aria-hidden="true"
+                className="drop-preview"
+                style={{
+                  gridColumn: dropPreview.day + 1,
+                  gridRow: `${dropPreview.top} / span ${
+                    eventBlocks.find((event) => event.id === draggingEventId)?.span ?? 1
+                  }`,
+                }}
+              />
+            )}
             {eventBlocks.map((event) => (
               <button
                 aria-label={`编辑 ${event.title}`}
                 className="week-event"
+                data-dragging={event.id === draggingEventId}
                 data-type={event.type}
                 key={event.id}
-                onClick={() => startEventEdit(event)}
+                onClick={(clickEvent) => {
+                  if (dragMovedRef.current) {
+                    clickEvent.preventDefault()
+                    dragMovedRef.current = false
+                    return
+                  }
+                  startEventEdit(event)
+                }}
+                onMouseDown={(mouseEvent) => startMouseDrag(mouseEvent, event.id)}
                 style={{
                   gridColumn: event.day + 1,
                   gridRow: `${event.top} / span ${event.span}`,
@@ -720,9 +1046,7 @@ function normalizeWeekEvent(event: WeekEvent): WeekEvent {
 }
 
 function getEventTop(time: string) {
-  const hour = Number.parseInt(time.slice(0, 2), 10)
-  const minute = Number.parseInt(time.slice(3, 5), 10)
-  return Math.min(20, Math.max(1, (hour - 14) * 2 + (minute >= 30 ? 2 : 1)))
+  return Math.min(20, Math.max(1, Math.floor((timeToMinutes(time) - 14 * 60) / 30) + 1))
 }
 
 function getEventSpan(startTime: string, endTime: string) {
@@ -739,6 +1063,22 @@ function normalizeTimeInput(value: string, fallback: string) {
   if (/^\d{2}:\d{2}$/.test(trimmed)) return trimmed
   if (/^\d{4}$/.test(trimmed)) return `${trimmed.slice(0, 2)}:${trimmed.slice(2)}`
   return fallback
+}
+
+function timeToMinutes(time: string) {
+  const hour = Number.parseInt(time.slice(0, 2), 10)
+  const minute = Number.parseInt(time.slice(3, 5), 10)
+  return hour * 60 + minute
+}
+
+function topToMinutes(top: number) {
+  return 14 * 60 + (top - 1) * 30
+}
+
+function minutesToTime(minutes: number) {
+  const hour = Math.floor(minutes / 60)
+  const minute = minutes % 60
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
 }
 
 function Firewall({ notifications }: { notifications: NotificationItem[] }) {
