@@ -1,0 +1,14 @@
+node_modules/
+dist/
+dist-ssr/
+logs/
+*.log
+*.local
+
+tmp/
+docx_render_check/
+
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
