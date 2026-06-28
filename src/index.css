@@ -875,6 +875,7 @@ h2 {
 
 .chat-message {
   animation: messageIn 260ms ease both;
+  white-space: pre-wrap;
 }
 
 .chat-message.user {

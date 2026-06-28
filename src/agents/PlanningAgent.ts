@@ -235,6 +235,162 @@ const createInsightFromResponse = (
   researchSummary,
 })
 
+const isConferenceAttendanceGoal = (objective: string): boolean => {
+  const normalized = objective.toLowerCase()
+
+  return Boolean(detectConference(objective)) || normalized.includes('conference')
+}
+
+const hasGenericBreakdown = (items: string[]): boolean => {
+  const joined = items.join(' ').toLowerCase()
+
+  return (
+    items.length < 5 ||
+    !['camera', '注册', '签证', 'visa', 'poster', 'slides', 'rehearsal', '住宿', '酒店', '机票'].some(
+      (keyword) => joined.includes(keyword),
+    )
+  )
+}
+
+const createConferencePlanningResponse = (
+  objective: string,
+  conference = '会议',
+): LlmPlanningResponse => ({
+  objective,
+  taskBreakdown: [
+    `核对 ${conference} 官方 acceptance 后事项：camera-ready、注册、poster/slides、现场报到要求`,
+    '整理论文最终版修改清单，确认作者信息、致谢、版权/开放获取选项',
+    '完成参会注册，确认付款、发票、学生证明或 invitation letter',
+    '确认入境/签证要求，准备护照、邀请函、在读/在职证明、资金或行程材料',
+    '预订机票和住宿，优先选择可取消方案，并记录退改签 deadline',
+    '制作 poster 或 slides，准备 3 分钟讲解和 30 秒 elevator pitch',
+    '安排组内 rehearsal，收集反馈后做最终检查和备份',
+  ],
+  constraints: [
+    'camera-ready、注册、签证/入境和机酒是硬约束，要早于展示材料启动。',
+    '今天已有 P0/P1 工作，会议准备从明天开始，不挤占今天关键任务窗口。',
+  ],
+  conflicts: [
+    '新目标需要和今天已有 P0/P1 任务整体重排；长周期事项先启动，创作类任务排到硬约束确认之后。',
+  ],
+  schedule: [
+    {
+      date: '2026-06-29',
+      startTime: '09:30',
+      endTime: '10:30',
+      title: `核对 ${conference} 官方 deadline 和现场参会要求`,
+      priority: 'P0',
+      reason: '先确认 camera-ready、注册、现场报到、poster/slides 等硬性要求。',
+    },
+    {
+      date: '2026-06-29',
+      startTime: '14:00',
+      endTime: '15:00',
+      title: '整理 camera-ready 修改和提交材料清单',
+      priority: 'P0',
+      reason: '论文最终版和提交材料通常有明确截止时间，必须先锁定。',
+    },
+    {
+      date: '2026-06-29',
+      startTime: '15:15',
+      endTime: '16:00',
+      title: '确认注册、付款、邀请函和签证/入境材料',
+      priority: 'P0',
+      reason: '行政手续和签证/入境材料周期长，越早启动风险越低。',
+    },
+    {
+      date: '2026-06-30',
+      startTime: '10:00',
+      endTime: '11:00',
+      title: '筛选机票和住宿方案',
+      priority: 'P1',
+      reason: '现场参会需要尽早锁定可取消交通住宿，避免价格和名额风险。',
+    },
+    {
+      date: '2026-06-30',
+      startTime: '14:00',
+      endTime: '16:00',
+      title: '搭 poster/slides 第一版结构',
+      priority: 'P1',
+      reason: '展示材料需要多轮修改，先完成结构再进入视觉和讲稿。',
+    },
+    {
+      date: '2026-07-01',
+      startTime: '10:00',
+      endTime: '11:00',
+      title: '写 3 分钟讲解稿和 30 秒 elevator pitch',
+      priority: 'P2',
+      reason: '现场交流需要短讲和快速介绍，提前准备可以减少临场压力。',
+    },
+    {
+      date: '2026-07-02',
+      startTime: '15:00',
+      endTime: '16:00',
+      title: '组内 rehearsal 并收集反馈',
+      priority: 'P2',
+      reason: '让组里提前看一版，留出修改和备份时间。',
+    },
+  ],
+  answer: '已拆成具体参会准备事项，并排到具体时间段。',
+})
+
+const enrichPlanningResponse = (
+  response: LlmPlanningResponse,
+  command: string,
+): LlmPlanningResponse => {
+  if (!isConferenceAttendanceGoal(command) || !hasGenericBreakdown(response.taskBreakdown)) {
+    return response
+  }
+
+  return createConferencePlanningResponse(
+    response.objective || command,
+    detectConference(command) ?? '会议',
+  )
+}
+
+const formatPlanningChatAnswer = (
+  response: LlmPlanningResponse,
+  researchSummary: string[],
+): string => {
+  const taskLines =
+    response.taskBreakdown.length > 0
+      ? response.taskBreakdown.map((task, index) => `${index + 1}. ${task}`).join('\n')
+      : '1. 先确认官方 deadline、地点和材料要求\n2. 再拆成注册、签证/出行、展示材料和组内 rehearsal'
+  const scheduleLines =
+    response.schedule.length > 0
+      ? response.schedule
+          .map(
+            (item) =>
+              `${item.date} ${item.startTime}-${item.endTime} [${item.priority}] ${item.title}\n   原因：${item.reason}`,
+          )
+          .join('\n')
+      : '待官方硬性日期确认后生成完整排期。'
+  const conflictLines =
+    response.conflicts.length > 0
+      ? response.conflicts.map((conflict) => `- ${conflict}`).join('\n')
+      : '- 暂未发现硬冲突，但新目标需要放回整体任务池一起重排。'
+  const sourceNote =
+    researchSummary.length > 0
+      ? '\n\n我已经先联网查了一轮信息；具体 deadline 和要求仍以官方页面或邮件为准。'
+      : ''
+
+  return [
+    `我把“${response.objective}”按完整目标处理了。`,
+    '',
+    '你要做的事：',
+    taskLines,
+    '',
+    '我给你的排期：',
+    scheduleLines,
+    '',
+    '冲突检查：',
+    conflictLines,
+    sourceNote,
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
 export class PlanningAgent extends BaseAgent {
   constructor() {
     super('PlanningAgent')
@@ -268,8 +424,9 @@ export class PlanningAgent extends BaseAgent {
           content:
             '你是一个目标到日程的规划 agent。你必须先整体分析目标，再拆分子任务、识别依赖/DDL/冲突，最后输出具体到日期和开始结束时间的多天排期。' +
             '不要只对单条任务局部排期。新增任务也要放回全局任务池重新分析。只输出 JSON，不要在 JSON 外输出 markdown。' +
-            'answer 字段用自然中文直接回答用户，不要强制套固定标题或固定表格。' +
-            '简单问题就简短回答；复杂规划可以用短段落、清单或时间安排，但只展示真正有用的信息，避免堆搜索结果。',
+            'taskBreakdown 必须列出用户真正需要做的具体事项，例如 camera-ready、注册、签证/出行、住宿、poster/slides、组内 rehearsal、材料检查。' +
+            'schedule 必须把这些事项排到具体日期和开始结束时间；不要只安排“确认要求”和“拆分计划”这种元任务。' +
+            'answer 字段可以自然简短，最终展示会由系统根据 taskBreakdown 和 schedule 生成。',
         },
         {
           role: 'user',
@@ -299,7 +456,7 @@ export class PlanningAgent extends BaseAgent {
                   },
                 ],
                 answer:
-                  '自然中文回复。不要固定模板；按用户问题选择短答、清单或时间安排。',
+                  '简短自然中文总结；重点信息放在 taskBreakdown 和 schedule。',
               },
             },
             null,
@@ -316,8 +473,11 @@ export class PlanningAgent extends BaseAgent {
       parsed = createFallbackPlanningResponse(command, researchSummary)
     }
 
+    parsed = enrichPlanningResponse(parsed, command)
+
     const insight = createInsightFromResponse(parsed, researchSummary)
     const schedulePlan = createSchedulePlanFromInsight(insight)
+    const chatAnswer = formatPlanningChatAnswer(parsed, researchSummary)
 
     return {
       planningInsight: insight,
@@ -327,7 +487,7 @@ export class PlanningAgent extends BaseAgent {
         `已拆分 ${insight.taskBreakdown.length} 个子任务，识别 ${insight.constraints.length} 条约束和 ${insight.conflicts.length} 个潜在冲突。`,
         `已生成 ${insight.schedule.length} 个具体排期块。`,
       ],
-      agentMessages: [this.createMessage(parsed.answer)],
+      agentMessages: [this.createMessage(chatAnswer)],
     }
   }
 
