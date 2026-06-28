@@ -336,8 +336,8 @@ h2 {
 
 .console-layout {
   display: grid;
-  grid-template-columns: minmax(280px, 0.86fr) minmax(420px, 1.28fr) minmax(300px, 0.95fr);
-  gap: 16px;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 18px;
   align-items: start;
 }
 
@@ -393,50 +393,71 @@ h2 {
   z-index: 1;
 }
 
-.layout-left,
-.layout-center,
-.layout-right {
-  display: grid;
-  gap: 14px;
+.timeline-shell,
+.chat-shell,
+.support-grid {
   min-width: 0;
 }
 
-.layout-left {
+.timeline-shell {
   grid-column: 1 / -1;
+  justify-self: center;
+  width: min(100%, 1360px);
 }
 
-.layout-center {
-  grid-column: 1 / span 2;
-  grid-template-rows: auto minmax(260px, 1fr) auto;
+.chat-shell {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 14px;
+  order: 2;
 }
 
-.layout-right {
-  grid-column: 3;
-  grid-template-rows: minmax(330px, auto) auto;
+.support-grid {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 14px;
+  order: 3;
 }
 
-.layout-left .panel {
+.agent-chat-panel {
+  grid-column: 2 / span 10;
+  order: 1;
+  justify-self: stretch;
+}
+
+.morning-brief-panel {
+  grid-column: 2 / span 10;
+  order: 2;
+}
+
+.github-inbox-panel {
+  grid-column: 1 / span 6;
+}
+
+.firewall-panel {
+  grid-column: 7 / span 6;
+}
+
+.timeline-shell .panel {
   animation-delay: 40ms;
 }
 
-.layout-center .panel:nth-child(1) {
+.agent-chat-panel {
   animation-delay: 90ms;
 }
 
-.layout-center .panel:nth-child(2) {
+.morning-brief-panel {
   animation-delay: 140ms;
 }
 
-.layout-right .panel:nth-child(1) {
+.github-inbox-panel {
   animation-delay: 190ms;
 }
 
-.layout-right .panel:nth-child(2) {
+.firewall-panel {
   animation-delay: 240ms;
-}
-
-.layout-right .panel:nth-child(3) {
-  animation-delay: 290ms;
 }
 
 .panel-title {
@@ -452,6 +473,10 @@ h2 {
 .agent-chat-panel {
   max-height: calc(100svh - 136px);
   overflow: hidden;
+}
+
+.agent-chat-panel {
+  max-height: none;
 }
 
 .timeline-panel {
@@ -1368,10 +1393,19 @@ h2 {
     grid-template-rows: auto;
   }
 
-  .layout-left,
-  .layout-center,
-  .layout-right {
-    grid-column: auto;
+  .timeline-shell,
+  .chat-shell,
+  .support-grid,
+  .agent-chat-panel,
+  .morning-brief-panel,
+  .github-inbox-panel,
+  .firewall-panel {
+    grid-column: 1 / -1;
+  }
+
+  .chat-shell,
+  .support-grid {
+    grid-template-columns: 1fr;
   }
 
   .timeline-panel,

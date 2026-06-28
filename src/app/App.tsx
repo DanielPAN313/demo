@@ -1,30 +1,22 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PointerEvent } from 'react'
 import {
   AgentPanel,
   AttentionFirewall,
-  Dashboard,
-  DemoControls,
   GitHubInboxPanel,
   MorningBrief,
   Timeline,
 } from '../components'
 import type {
   AgentMessage as PanelMessage,
-  DashboardMetric,
-  DemoAction,
   FirewallItem,
-  FocusTask,
   MorningBriefItem,
   TimelineItem,
 } from '../components'
 import {
   demoScenario,
-  externalEvents,
   initialNotifications,
   initialSchedulePlan,
-  tasks,
-  userStates,
 } from '../data'
 import { createAgentEvent } from '../core/agentEvents'
 import { fetchGitHubInbox, mapInboxItemToExternalEvent } from '../core/githubInboxClient'
@@ -47,17 +39,6 @@ const labelByChannel = {
   silent: '静默归档',
 } satisfies Record<NotificationChannel, string>
 
-const scenarioByActionId: Record<
-  string,
-  'poorSleep' | 'highStress' | 'githubP1' | 'nightMode' | 'morningBrief'
-> = {
-  poorSleep: 'poorSleep',
-  highStress: 'highStress',
-  githubP1: 'githubP1',
-  nightMode: 'nightMode',
-  morningBrief: 'morningBrief',
-}
-
 const scenarioLabel = {
   baseline: '基础节律',
   poorSleep: '睡眠差',
@@ -67,45 +48,6 @@ const scenarioLabel = {
   morningBrief: '晨报生成',
 } satisfies Record<string, string>
 
-const createEventFromAction = (action: DemoAction): AgentRuntimeEvent => {
-  const timestamp = new Date().toISOString()
-
-  switch (action.id) {
-    case 'poorSleep':
-      return createAgentEvent('USER_STATE_CHANGED', {
-        userState: userStates.sleepDeprived,
-        timestamp,
-      })
-    case 'highStress':
-      return createAgentEvent('USER_STATE_CHANGED', {
-        userState: userStates.stressed,
-        timestamp,
-      })
-    case 'githubP1':
-      return createAgentEvent('EXTERNAL_EVENT_INSERTED', {
-        externalEvent: externalEvents[0],
-        timestamp,
-      })
-    case 'nightMode':
-      return createAgentEvent('NIGHT_MODE_STARTED', { timestamp })
-    case 'morningBrief':
-      return createAgentEvent('MORNING_BRIEF_REQUESTED', { timestamp })
-    default:
-      return createAgentEvent('INIT', { timestamp })
-  }
-}
-
-const demoActions: DemoAction[] = [
-  { id: 'toggleGithubWatch', label: 'Watch GitHub', description: '每 1 分钟静默检查新通知' },
-  { id: 'syncGithubInbox', label: 'Sync GitHub Inbox', description: '拉取账号级 issue / PR / mentions' },
-  { id: 'poorSleep', label: '睡眠差', description: '降低上午深度任务密度' },
-  { id: 'highStress', label: '压力高', description: '延后强沟通任务' },
-  { id: 'githubP1', label: '插入 GitHub P1', description: '触发突发事件解释' },
-  { id: 'nightMode', label: '进入夜间模式', description: '普通通知静默归档' },
-  { id: 'morningBrief', label: '生成晨报', description: '汇总夜间事件和今日建议' },
-  { id: 'reset', label: '重置演示', description: '回到初始状态', variant: 'secondary' },
-]
-
 type ApplyAgentResultOptions = {
   compactChat?: boolean
 }
@@ -113,15 +55,13 @@ type ApplyAgentResultOptions = {
 function App() {
   const { state, actions } = useAppState()
   const [isAgentRunning, setIsAgentRunning] = useState(false)
-  const [isGitHubWatching, setIsGitHubWatching] = useState(false)
+  const [isGitHubWatching] = useState(false)
   const [githubWatchStatus, setGitHubWatchStatus] = useState('GitHub watch off')
   const seenGitHubItemIdsRef = useRef<Set<string>>(new Set())
   const isGitHubWatchCheckingRef = useRef(false)
   const activeSchedulePlan = state.schedulePlan ?? initialSchedulePlan
   const activeNotifications =
     state.notifications.length > 0 ? state.notifications : initialNotifications
-  const currentUserState = state.userState
-
   const panelMessages: PanelMessage[] = state.agentMessages.map((message) => ({
     id: message.id,
     role: message.role,
@@ -190,99 +130,6 @@ function App() {
         {
           role: 'system',
           content: `DeepSeek API 调用失败：${message}`,
-        },
-      ])
-    } finally {
-      setIsAgentRunning(false)
-    }
-  }
-
-  const visibleDemoActions = useMemo(
-    () =>
-      demoActions.map((action) =>
-        action.id === 'toggleGithubWatch'
-          ? {
-              ...action,
-              label: isGitHubWatching ? 'Stop GitHub Watch' : 'Watch GitHub',
-              description: githubWatchStatus,
-              variant: isGitHubWatching ? ('secondary' as const) : action.variant,
-            }
-          : action,
-      ),
-    [githubWatchStatus, isGitHubWatching],
-  )
-
-  const handleDemoAction = (action: DemoAction) => {
-    if (action.id === 'reset') {
-      actions.resetDemo()
-      return
-    }
-
-    if (action.id === 'syncGithubInbox') {
-      void handleSyncGitHubInbox()
-      return
-    }
-
-    if (action.id === 'toggleGithubWatch') {
-      setIsGitHubWatching((current) => !current)
-      return
-    }
-
-    if (action.id === 'poorSleep') {
-      actions.setUserState(userStates.sleepDeprived)
-    }
-
-    if (action.id === 'highStress') {
-      actions.setUserState(userStates.stressed)
-    }
-
-    if (action.id === 'githubP1') {
-      actions.insertExternalEvent(externalEvents[0])
-    }
-
-    const scenario = scenarioByActionId[action.id]
-    if (scenario) {
-      actions.switchScenario(scenario)
-    }
-
-    void runPipelineAndApply(createEventFromAction(action))
-  }
-
-  const handleSyncGitHubInbox = async () => {
-    setIsAgentRunning(true)
-
-    try {
-      const inbox = await fetchGitHubInbox()
-      const events = inbox.items.map(mapInboxItemToExternalEvent)
-
-      seenGitHubItemIdsRef.current = new Set(inbox.items.map((item) => item.id))
-      actions.updateGitHubInboxItems(inbox.items)
-      setGitHubWatchStatus(
-        `Last checked ${new Date(inbox.fetchedAt).toLocaleTimeString()} · ${inbox.counts.merged} items`,
-      )
-      actions.insertExternalEvents(events)
-      actions.addAgentMessages([
-        {
-          role: 'system',
-          content: `GitHub Inbox synced: ${inbox.counts.merged} related items (${inbox.counts.notifications} notifications, ${inbox.counts.assigned} assigned, ${inbox.counts.reviewRequested} review requests).`,
-        },
-      ])
-
-      const result = await runAgentPipeline(
-        createAgentEvent('EXTERNAL_EVENT_INSERTED', {
-          externalEvents: events,
-          replaceExternalEvents: true,
-          timestamp: inbox.fetchedAt,
-        }),
-      )
-      applyAgentResult(result, { compactChat: true })
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown GitHub error'
-
-      actions.addAgentMessages([
-        {
-          role: 'system',
-          content: `GitHub Inbox sync failed: ${message}`,
         },
       ])
     } finally {
@@ -391,35 +238,6 @@ function App() {
     priority: block.priority,
   }))
 
-  const dashboardMetrics: DashboardMetric[] = [
-    {
-      label: 'Sleep',
-      value: String(currentUserState.sleepScore),
-      note: currentUserState.label ?? '基础状态',
-    },
-    {
-      label: 'Stress',
-      value: currentUserState.stressLevel,
-      note: currentUserState.adjustmentHint ?? '当前无需额外调整',
-    },
-    {
-      label: 'Focus',
-      value: `${currentUserState.focusCapacity}m`,
-      note: '当前适合连续专注的分钟数',
-    },
-    {
-      label: 'Plan',
-      value: activeSchedulePlan.date,
-      note: activeSchedulePlan.summary,
-    },
-  ]
-
-  const focusTasks: FocusTask[] = tasks.slice(0, 3).map((task) => ({
-    title: task.title,
-    priority: task.priority,
-    window: task.deadline ?? `${task.estimatedMinutes}m`,
-  }))
-
   const firewallItems: FirewallItem[] = activeNotifications.map((notification) => ({
     route: firewallRouteByChannel[notification.channel],
     label: labelByChannel[notification.channel],
@@ -452,20 +270,11 @@ function App() {
       </header>
 
       <section className="console-layout" aria-label="Agent console overview">
-        <aside className="layout-left">
+        <section className="timeline-shell" aria-label="Weekly schedule">
           <Timeline items={timelineItems} />
-        </aside>
+        </section>
 
-        <section className="layout-center" aria-label="State and agent explanation">
-          <Dashboard
-            focusTasks={focusTasks}
-            metrics={dashboardMetrics}
-            recommendation={{
-              label: state.currentScenario === 'baseline' ? '当前建议' : 'Agent 已更新',
-              title: activeSchedulePlan.summary,
-              reason: currentUserState.adjustmentHint ?? '当前按基础排期执行。',
-            }}
-          />
+        <section className="chat-shell" aria-label="Agent explanation and chat">
           <AgentPanel
             isSending={isAgentRunning}
             messages={panelMessages}
@@ -488,18 +297,13 @@ function App() {
           )}
         </section>
 
-        <aside className="layout-right">
+        <section className="support-grid" aria-label="State and live signals">
           <GitHubInboxPanel
             items={state.githubInboxItems ?? []}
             status={githubWatchStatus}
           />
           <AttentionFirewall items={firewallItems} />
-          <DemoControls
-            actions={visibleDemoActions}
-            activeActionId={state.currentScenario}
-            onAction={handleDemoAction}
-          />
-        </aside>
+        </section>
       </section>
     </main>
   )
